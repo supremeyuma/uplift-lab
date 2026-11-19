@@ -1,6 +1,6 @@
 # PLAN — UpLift (causal targeting engine)
 
-Status: **M2 complete** · Owner: supreme · Target completion: 6 milestones / ~2 weeks
+Status: **M6 complete** · Owner: supreme · Target completion: 6 milestones / ~2 weeks
 
 This document is the contract for the coding agent building this repo. Work one milestone at a
 time. A milestone is done only when its **acceptance commands** pass from a clean clone. Update the
@@ -282,4 +282,4 @@ Coverage target: 85% on `src/uplift` (excluding plotting), enforced in CI.
 - [x] M3 Qini, uplift@k, calibration
 - [x] M4 decision layer + memo
 - [x] M5 reproducible report + consistency gate
-- [ ] M6 case study, ADRs, v1.0.0, CV block added
+- [x] M6 case study, ADRs, v1.0.0, CV block added
