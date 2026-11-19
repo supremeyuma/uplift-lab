@@ -19,11 +19,24 @@ def payload(tmp_path_factory: pytest.TempPathFactory) -> dict[str, object]:
 
 def test_report_writes_metrics_and_figures(payload: dict[str, object], tmp_path: Path) -> None:
     result = report.build_report(fixture=True, resamples=40, output_dir=tmp_path)
-    for name in ("metrics.json", "qini.png", "uplift-at-k.png", "calibration.png"):
+    for name in (
+        "metrics.json",
+        "qini.png",
+        "uplift-at-k.png",
+        "calibration.png",
+        "decision-memo.md",
+    ):
         assert (tmp_path / name).exists(), name
     metrics = result["metrics"]
     assert isinstance(metrics, dict)
-    for key in ("qini", "uplift_at_5", "uplift_at_10", "uplift_at_20", "calibration_error"):
+    for key in (
+        "qini",
+        "uplift_at_5",
+        "uplift_at_10",
+        "uplift_at_20",
+        "calibration_error",
+        "incremental_margin",
+    ):
         assert key in metrics
 
 
@@ -54,6 +67,20 @@ def test_report_is_deterministic(payload: dict[str, object], tmp_path: Path) -> 
     again = report.build_report(fixture=True, resamples=60, output_dir=tmp_path)
     assert again["metrics"] == payload["metrics"]
     assert again["model"] == payload["model"]
+    assert again["decision"] == payload["decision"]
+
+
+def test_decision_memo_is_written_with_naira_and_ci(payload: dict[str, object], tmp_path: Path) -> None:
+    report.build_report(fixture=True, resamples=20, output_dir=tmp_path)
+    memo = (tmp_path / "decision-memo.md").read_text(encoding="utf-8")
+    assert "# Decision memo" in memo
+    assert "₦" in memo
+    assert "95%" in memo
+    assert "## Excluded segment" in memo
+    decision = payload["decision"]
+    assert isinstance(decision, dict)
+    assert decision["ci_low"] <= decision["measured_value"] <= decision["ci_high"]
+    assert len(decision["sensitivity"]) == 15
 
 
 def test_metrics_json_matches_returned_payload(payload: dict[str, object], tmp_path: Path) -> None:

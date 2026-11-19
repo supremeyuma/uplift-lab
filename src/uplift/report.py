@@ -25,6 +25,15 @@ from uplift.config import (
 from uplift.data.loader import load_frame, load_split_indices, split_frame
 from uplift.data.schema import HILLSTROM, DatasetSchema
 from uplift.data.synthetic import make_experiment
+from uplift.decision.cost import (
+    CostMatrix,
+    find_excluded_segment,
+    segment_uplift,
+    sensitivity_grid,
+    summarize_policy,
+    value_range,
+)
+from uplift.decision.memo import write_memo
 from uplift.eval.calibration import calibration_error, calibration_table
 from uplift.eval.figures import calibration_figure, qini_figure, uplift_at_k_figure
 from uplift.eval.qini import QiniResult, qini_coefficient, qini_curve, qini_with_ci
@@ -218,6 +227,41 @@ def build_report(
         table, target_dir / "calibration.png", f"Calibration by score decile ({split})"
     )
 
+    cost = CostMatrix()
+    policy = summarize_policy(
+        y_eval, t_eval, uplift_score, cost, resamples=resamples, seed=seed
+    )
+    grid = sensitivity_grid(y_eval, t_eval, uplift_score)
+    grid_low, grid_high = value_range(grid)
+    segment_rows = segment_uplift(
+        y_eval,
+        t_eval,
+        uplift_score,
+        evaluation["history_segment"].to_numpy(),
+        resamples=300,
+        seed=seed,
+    )
+    if not segment_rows:  # pragma: no cover - guarded by decile/segment counts
+        raise RuntimeError("no segment had both arms and enough rows")
+    excluded = find_excluded_segment(segment_rows)
+    lowest = min(segment_rows, key=lambda row: row["observed_uplift"])
+
+    decision_payload: dict[str, Any] = {
+        "assumptions": policy.assumptions,
+        "threshold": policy.threshold,
+        "n_targeted": policy.n_targeted,
+        "share_targeted": policy.share_targeted,
+        "predicted_value": policy.predicted_value,
+        "measured_incremental_conversions": policy.measured_incremental_conversions,
+        "measured_value": policy.measured_value,
+        "ci_low": policy.ci_low,
+        "ci_high": policy.ci_high,
+        "roi": policy.roi,
+        "resamples": resamples,
+        "range": {"low": grid_low, "high": grid_high},
+        "sensitivity": grid,
+    }
+
     payload: dict[str, Any] = {
         "dataset": schema.name,
         "source": frames.source,
@@ -230,14 +274,31 @@ def build_report(
             "qini": qini_payload,
             **uplift_payload,
             "calibration_error": calibration_payload["error"],
+            "incremental_margin": {
+                "value": policy.measured_value,
+                "ci_low": policy.ci_low,
+                "ci_high": policy.ci_high,
+                "predicted_value": policy.predicted_value,
+                "n_targeted": policy.n_targeted,
+                "range": {"low": grid_low, "high": grid_high},
+                "currency": cost.currency,
+            },
         },
         "calibration": calibration_payload,
+        "decision": decision_payload,
+        "segments": {
+            "by": "history_segment",
+            "table": segment_rows,
+            "excluded": excluded,
+            "lowest": lowest,
+        },
         "baselines": {
             "random_targeting": "uplift 0 by construction; untargeted campaign in the decision memo",
             "response_model": "p(conversion | x) logistic, trained on the same rows",
         },
     }
     write_json(target_dir / "metrics.json", payload)
+    write_memo(payload, target_dir / "decision-memo.md")
     return payload
 
 
@@ -278,6 +339,16 @@ def _main(argv: list[str] | None = None) -> int:
             f"[{_fmt(block['ci_low'])}, {_fmt(block['ci_high'])}]"
         )
     print(f"calibration error: {_fmt(metrics['calibration_error'])}")
+    decision = payload["decision"]
+    print(
+        f"targeted         : {decision['n_targeted']:,} "
+        f"({decision['share_targeted']:.1%}), break-even {decision['threshold']:.2%}"
+    )
+    print(
+        f"incremental margin: {decision['assumptions']['currency_code']} "
+        f"{decision['measured_value']:,.0f} "
+        f"[{decision['ci_low']:,.0f}, {decision['ci_high']:,.0f}]"
+    )
     print(f"written          : {(args.output_dir or reports_dir()) / 'metrics.json'}")
     return 0
 
