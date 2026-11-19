@@ -1,0 +1,29 @@
+{
+  "dataset": "hillstrom",
+  "source_url": "http://www.minethatdata.com/Kevin_Hillstrom_MineThatData_E-MailAnalytics_DataMiningChallenge_2008.03.20.csv",
+  "path": "data/raw/hillstrom.csv",
+  "fetched_at": "2026-11-19T23:12:10+00:00",
+  "sha256": "0e5893329d8b93cefecc571777672028290ab69865718020c78c7284f291aece",
+  "bytes": 3964977,
+  "row_count": 64000,
+  "columns": {
+    "recency": "int64",
+    "history_segment": "str",
+    "history": "float64",
+    "mens": "int64",
+    "womens": "int64",
+    "zip_code": "str",
+    "newbie": "int64",
+    "channel": "str",
+    "segment": "str",
+    "visit": "int64",
+    "conversion": "int64",
+    "spend": "float64"
+  },
+  "outcomes": [
+    "conversion",
+    "spend"
+  ],
+  "treatment": "segment",
+  "control_label": "No E-Mail"
+}
