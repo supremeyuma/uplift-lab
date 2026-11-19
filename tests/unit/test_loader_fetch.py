@@ -100,3 +100,25 @@ def test_manifest_shape_is_json_serialisable(harness: FetchHarness) -> None:
     manifest = loader.read_manifest("hillstrom")
     assert manifest["bytes"] == len(harness.payload)
     assert set(manifest["columns"]) == set(frame.columns)
+
+
+def test_ensure_dataset_fetches_once_and_regenerates_missing_splits(
+    harness: FetchHarness,
+) -> None:
+    loader.ensure_dataset()
+    assert loader.raw_path().exists()
+    assert loader.manifest_path().exists()
+    first = loader.load_split_indices()
+    assert len(harness.calls) == 1
+
+    loader.splits_path().unlink()
+    loader.ensure_dataset()
+    second = loader.load_split_indices()
+    assert len(harness.calls) == 1, "cached raw data must not be re-downloaded"
+    for name in first:
+        assert (first[name] == second[name]).all()
+
+    loader.manifest_path().unlink()
+    loader.ensure_dataset()
+    assert loader.manifest_path().exists()
+    assert len(harness.calls) == 1

@@ -22,7 +22,7 @@ jobs:
       - name: Test (with coverage gate)
         run: uv run pytest
 
-  pipeline:
+  pipeline-fixture:
     runs-on: ubuntu-latest
     needs: lint-typecheck-test
     steps:
@@ -33,6 +33,25 @@ jobs:
       - name: Install
         run: uv sync
       - name: End-to-end pipeline on the 2k-row fixture (offline)
-        run: uv run python -m uplift.report --split test --fixture
+        run: uv run python -m uplift.report --split test --fixture --output-dir reports/fixture
+      - name: Metrics schema and ranges
+        run: uv run python scripts/check_metrics_schema.py --metrics reports/fixture/metrics.json
+
+  readme-gate:
+    runs-on: ubuntu-latest
+    needs: pipeline-fixture
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+        with:
+          version: "0.13.x"
+      - name: Install
+        run: uv sync
+      - name: Fetch Hillstrom (cached under data/raw, writes the committed manifest)
+        run: make data
+      - name: Full report on the test split
+        run: make report
+      - name: Metrics schema and ranges
+        run: uv run python scripts/check_metrics_schema.py
       - name: README numbers match reports/metrics.json
         run: uv run python scripts/check_readme_numbers.py

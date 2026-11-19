@@ -281,5 +281,5 @@ Coverage target: 85% on `src/uplift` (excluding plotting), enforced in CI.
 - [x] M2 baselines + T-learner + optional causal forest
 - [x] M3 Qini, uplift@k, calibration
 - [x] M4 decision layer + memo
-- [ ] M5 reproducible report + consistency gate
+- [x] M5 reproducible report + consistency gate
 - [ ] M6 case study, ADRs, v1.0.0, CV block added

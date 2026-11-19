@@ -232,6 +232,19 @@ def load_splits(name: str = "hillstrom") -> dict[str, pd.DataFrame]:
     return {kind: frame.iloc[idx].reset_index(drop=True) for kind, idx in indices.items()}
 
 
+def ensure_dataset(name: str = "hillstrom") -> None:
+    """Make the cached raw file, manifest and splits available.
+
+    A fresh clone has no ``data/raw`` (gitignored): fetch once, then regenerate
+    the committed split file only if it is missing.
+    """
+    if not raw_path(name).exists() or not manifest_path(name).exists():
+        fetch(name)
+    verify_manifest(name)
+    if not splits_path(name).exists():
+        persist_splits(load_frame(name), name)
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--fetch", action="store_true", help="download and verify the dataset")

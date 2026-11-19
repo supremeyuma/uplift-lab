@@ -41,6 +41,7 @@ packages = ["src/uplift"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+pythonpath = ["."]
 addopts = "-q --strict-markers --cov=uplift --cov-report=term-missing --cov-fail-under=85"
 filterwarnings = ["error::FutureWarning"]
 markers = [
@@ -74,7 +75,7 @@ ignore = ["E501"]
 [tool.mypy]
 python_version = "3.11"
 strict = true
-files = ["src", "tests"]
+files = ["src", "tests", "scripts"]
 warn_unused_ignores = true
 show_error_codes = true
 

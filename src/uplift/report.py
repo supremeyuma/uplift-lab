@@ -22,7 +22,7 @@ from uplift.config import (
     ensure_dir,
     reports_dir,
 )
-from uplift.data.loader import load_frame, load_split_indices, split_frame
+from uplift.data.loader import ensure_dataset, load_frame, load_split_indices, split_frame
 from uplift.data.schema import HILLSTROM, DatasetSchema
 from uplift.data.synthetic import make_experiment
 from uplift.decision.cost import (
@@ -78,6 +78,7 @@ def load_splits(*, fixture: bool = False) -> SplitFrames:
             test=parts["test"],
             source="fixture:synthetic-2k",
         )
+    ensure_dataset()
     frame = load_frame()
     indices = load_split_indices()
     return SplitFrames(
@@ -246,6 +247,12 @@ def build_report(
     excluded = find_excluded_segment(segment_rows)
     lowest = min(segment_rows, key=lambda row: row["observed_uplift"])
 
+    untargeted_incremental = rate_difference * len(evaluation)
+    untargeted_value = (
+        untargeted_incremental * cost.margin_per_conversion
+        - cost.treatment_cost * len(evaluation)
+    )
+
     decision_payload: dict[str, Any] = {
         "assumptions": policy.assumptions,
         "threshold": policy.threshold,
@@ -260,6 +267,11 @@ def build_report(
         "resamples": resamples,
         "range": {"low": grid_low, "high": grid_high},
         "sensitivity": grid,
+        "untargeted_campaign": {
+            "n": len(evaluation),
+            "incremental_conversions": untargeted_incremental,
+            "value": untargeted_value,
+        },
     }
 
     payload: dict[str, Any] = {
@@ -282,6 +294,7 @@ def build_report(
                 "n_targeted": policy.n_targeted,
                 "range": {"low": grid_low, "high": grid_high},
                 "currency": cost.currency,
+                "baselines": {"untargeted_campaign": untargeted_value},
             },
         },
         "calibration": calibration_payload,

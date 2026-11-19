@@ -123,3 +123,12 @@ def test_split_frames_are_disjoint() -> None:
     total = len(frames.train) + len(frames.validation) + len(frames.test)
     assert total == len(report.load_fixture())
     assert len(frames.train) > len(frames.test)
+
+
+def test_report_runs_from_fixture_under_2_minutes(tmp_path: Path) -> None:
+    import time
+
+    start = time.perf_counter()
+    report.build_report(fixture=True, output_dir=tmp_path)
+    elapsed = time.perf_counter() - start
+    assert elapsed < 120.0, f"fixture pipeline took {elapsed:.1f}s"
