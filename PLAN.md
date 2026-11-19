@@ -1,6 +1,6 @@
 # PLAN — UpLift (causal targeting engine)
 
-Status: **M1 complete** · Owner: supreme · Target completion: 6 milestones / ~2 weeks
+Status: **M2 complete** · Owner: supreme · Target completion: 6 milestones / ~2 weeks
 
 This document is the contract for the coding agent building this repo. Work one milestone at a
 time. A milestone is done only when its **acceptance commands** pass from a clean clone. Update the
@@ -278,7 +278,7 @@ Coverage target: 85% on `src/uplift` (excluding plotting), enforced in CI.
 
 - [x] M0 scaffold + CI
 - [x] M1 data contract, splits, power analysis
-- [ ] M2 baselines + T-learner + optional causal forest
+- [x] M2 baselines + T-learner + optional causal forest
 - [ ] M3 Qini, uplift@k, calibration
 - [ ] M4 decision layer + memo
 - [ ] M5 reproducible report + consistency gate

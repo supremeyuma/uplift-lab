@@ -1,8 +1,12 @@
 """Synthetic experiments with a known treatment effect.
 
 Tests and the offline CI pipeline use these generators instead of the real
-dataset: the true ATE and the true subgroup heterogeneity are known exactly,
-so recovery can be asserted rather than hoped for.
+dataset: the counterfactual conversion probabilities are known exactly, so
+recovery can be asserted rather than hoped for.
+
+The treatment acts on the log-odds scale (``logit_effect``), which makes the
+per-arm logistic specification correct by construction. The reported truth is
+always the probability-scale ATE, averaged over the actual rows.
 """
 
 from __future__ import annotations
@@ -51,20 +55,20 @@ def make_experiment(
     n: int = 4000,
     seed: int = SEED,
     *,
-    tau: float = 0.05,
+    logit_effect: float = 0.35,
     heterogeneity: float = 0.0,
     treatment_share: float = 0.5,
     outcome: str = "conversion",
 ) -> SyntheticExperiment:
-    """Generate an experiment whose per-row true uplift is known.
+    """Generate an experiment whose per-row true uplift is known exactly.
 
-    ``tau`` is the average absolute uplift in conversion probability. When
-    ``heterogeneity`` is non-zero, the effect is larger for customers with an
-    above-median spend history and correspondingly smaller below it (mean
-    effect stays ``tau``).
+    ``logit_effect`` is the shift in log-odds applied to treated rows. When
+    ``heterogeneity`` is non-zero the shift is larger for customers with an
+    above-median spend history and smaller below it, centred so the average
+    shift stays ``logit_effect``.
     """
-    if not 0.0 <= tau <= 1.0:
-        raise ValueError("tau must be in [0, 1]")
+    if logit_effect < 0.0:
+        raise ValueError("logit_effect must be non-negative")
     rng = np.random.default_rng(seed)
 
     history = rng.gamma(shape=2.0, scale=60.0, size=n)
@@ -75,22 +79,27 @@ def make_experiment(
     zip_code = rng.choice(["Rural", "Surburban", "Urban"], size=n, p=[0.2, 0.6, 0.2])
     channel = rng.choice(["Multichannel", "Phone", "Web"], size=n, p=[0.2, 0.3, 0.5])
 
+    # Linear in the covariates the learner actually sees (log1p(history) is
+    # reconstructed from history by the tree learners; logistic uses raw history,
+    # so keep the history term linear).
     logit = (
-        -3.0
-        + 0.9 * np.log1p(history) / 3.0
+        -2.6
+        + 0.0020 * history
         + 0.45 * mens
         + 0.20 * womens
         - 0.30 * newbie
         + 0.25 * (channel == "Multichannel")
-        - 0.15 * recency / 12.0
+        - 0.02 * recency
+        + 0.10 * (zip_code == "Surburban")
     )
-    baseline = np.clip(_sigmoid(logit), 0.01, 0.60)
+    baseline = _sigmoid(logit)
 
     above = (history > np.median(history)).astype(float)
-    uplift = tau + heterogeneity * (above - 0.5)
+    shift = logit_effect + heterogeneity * (above - 0.5)
+    treated_prob = _sigmoid(logit + shift)
 
     treated = rng.binomial(1, treatment_share, size=n).astype(bool)
-    prob = np.clip(baseline + treated * uplift, 0.0, 0.95)
+    prob = np.where(treated, treated_prob, baseline)
     conversion = rng.binomial(1, prob).astype(int)
     spend = np.where(conversion == 1, rng.gamma(shape=2.0, scale=40.0, size=n), 0.0)
     visit = rng.binomial(1, np.clip(prob * 3.0, 0.0, 1.0)).astype(int)
@@ -112,8 +121,7 @@ def make_experiment(
         }
     )
     if outcome == "spend":
-        # same assignment, spend is the outcome of interest
-        pass
+        pass  # same assignment; spend is analysed as the outcome
     elif outcome != "conversion":
         raise ValueError(f"unknown outcome {outcome!r}")
 
@@ -121,5 +129,5 @@ def make_experiment(
     order = rng.permutation(n)
     frame = frame.iloc[order].reset_index(drop=True)
     return SyntheticExperiment(
-        frame=frame, true_uplift=uplift[order], seed=seed
+        frame=frame, true_uplift=(treated_prob - baseline)[order], seed=seed
     )
